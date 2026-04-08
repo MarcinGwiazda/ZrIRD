@@ -1,0 +1,63 @@
+SELECT salary, first_name, last_name, RANK() OVER (ORDER BY salary DESC) AS ranking FROM employees;
+
+SELECT first_name, last_name, salary, SUM(salary) OVER () AS suma_wszystkich_pensji FROM employees;
+
+CREATE TABLE sales AS SELECT * FROM hr.sales;
+CREATE TABLE products AS SELECT * FROM hr.products;
+
+SELECT e.last_name, p.product_name, SUM(s.price * s.quantity) 
+OVER (PARTITION BY e.employee_id ORDER BY s.sale_date) AS skumulowana_sprzedaz,
+RANK() OVER (ORDER BY s.price * s.quantity DESC) AS ranking_sprzedazy FROM sales s
+JOIN employees e ON s.employee_id = e.employee_id
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT e.last_name, p.product_name, s.price, COUNT(*) OVER (PARTITION BY p.product_id, s.sale_date) AS liczba_transakcji,
+SUM(s.price * s.quantity) OVER (PARTITION BY p.product_id, s.sale_date) AS suma_dnia,
+LAG(s.price) OVER (PARTITION BY p.product_id ORDER BY s.sale_date) AS poprzednia_cena,
+LEAD(s.price) OVER (PARTITION BY p.product_id ORDER BY s.sale_date) AS kolejna_cena FROM sales s
+JOIN employees e ON s.employee_id = e.employee_id
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT p.product_name, s.price, SUM(s.price * s.quantity) OVER (PARTITION BY p.product_id, TRUNC(s.sale_date, 'MM')) AS suma_miesiaca,
+SUM(s.price * s.quantity) OVER (PARTITION BY p.product_id, TRUNC(s.sale_date, 'MM')
+ORDER BY s.sale_date) AS suma_rosnaca FROM sales s
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT p.product_name, p.product_category,
+MAX(CASE WHEN EXTRACT(YEAR FROM s.sale_date)=2022 THEN s.price END) AS cena_2022,
+MAX(CASE WHEN EXTRACT(YEAR FROM s.sale_date)=2023 THEN s.price END) AS cena_2023,
+MAX(CASE WHEN EXTRACT(YEAR FROM s.sale_date)=2023 THEN s.price END)
+- MAX(CASE WHEN EXTRACT(YEAR FROM s.sale_date)=2022 THEN s.price END) AS roznica
+FROM sales s
+JOIN products p ON s.product_id = p.product_id
+GROUP BY p.product_name, p.product_category, TO_CHAR(s.sale_date,'MM-DD');
+
+SELECT p.product_name, p.product_category, s.price,
+MIN(s.price) OVER (PARTITION BY p.product_category) AS min_kat,
+MAX(s.price) OVER (PARTITION BY p.product_category) AS max_kat,
+MAX(s.price) OVER (PARTITION BY p.product_category)
+- MIN(s.price) OVER (PARTITION BY p.product_category) AS roznica
+FROM sales s
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT p.product_name, s.sale_date, s.price, AVG(s.price) OVER (PARTITION BY s.product_id ORDER BY sale_date
+ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS srednia_kroczaca
+FROM sales s
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT p.product_name, p.product_category, s.price,
+RANK() OVER (PARTITION BY p.product_category ORDER BY s.price DESC) AS ranking,
+ROW_NUMBER() OVER (PARTITION BY p.product_category ORDER BY s.price DESC) AS numer_wiersza,
+DENSE_RANK() OVER (PARTITION BY p.product_category ORDER BY s.price DESC) AS dense_ranking
+FROM sales s
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT e.last_name, p.product_name,
+SUM(s.price * s.quantity) OVER (PARTITION BY e.employee_id ORDER BY s.sale_date) AS rosnaca_sprzedaz,
+RANK() OVER (ORDER BY (s.price * s.quantity) DESC) AS ranking_globalny
+FROM sales s
+JOIN employees e ON s.employee_id = e.employee_id
+JOIN products p ON s.product_id = p.product_id;
+
+SELECT DISTINCT e.first_name, e.last_name, e.job_id FROM employees e
+JOIN sales s ON e.employee_id = s.employee_id;
